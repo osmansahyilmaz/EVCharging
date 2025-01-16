@@ -1,5 +1,7 @@
+com\chargesquare\config\RedisConfig.class
 com\chargesquare\ChargingStationApplication.class
 com\chargesquare\controller\ChargingStationController.class
 com\chargesquare\model\ChargingStation.class
 com\chargesquare\repository\ChargingStationRepository.class
+com\chargesquare\config\GatewayConfig.class
 com\chargesquare\model\ChargingStation$StationStatus.class

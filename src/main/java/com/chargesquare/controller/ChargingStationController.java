@@ -7,7 +7,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import java.util.List;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @RestController
 @RequestMapping("/stations")
@@ -21,20 +25,27 @@ public class ChargingStationController {
     }
 
     @GetMapping
-    public List<ChargingStation> getAllStations() {
-        return repository.findAll();
+    @Cacheable(value = "stations", key = "'all'")
+    public Flux<ChargingStation> getAllStations() {
+        return Flux.defer(() -> Flux.fromIterable(repository.findAll()))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ChargingStation> getStationById(@PathVariable Long id) {
-        return repository.findById(id)
+    public Mono<ResponseEntity<ChargingStation>> getStationById(@PathVariable Long id) {
+        return Mono.defer(() -> 
+            Mono.justOrEmpty(repository.findById(id))
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .defaultIfEmpty(ResponseEntity.notFound().build()))
+            .subscribeOn(Schedulers.boundedElastic())
+            .cache();
     }
 
     @PostMapping
-    public ResponseEntity<ChargingStation> createStation(@Valid @RequestBody ChargingStation station) {
-        ChargingStation savedStation = repository.save(station);
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedStation);
+    @CacheEvict(value = "stations", allEntries = true)
+    public Mono<ResponseEntity<ChargingStation>> createStation(@Valid @RequestBody ChargingStation station) {
+        return Mono.defer(() -> Mono.just(repository.save(station)))
+                .map(saved -> ResponseEntity.status(HttpStatus.CREATED).body(saved))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 } 
