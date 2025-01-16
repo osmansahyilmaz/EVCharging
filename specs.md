@@ -8,6 +8,8 @@
 - Reactor Cache Layer
 - Core Service (Spring WebFlux)
 - PostgreSQL Database
+- Apache Kafka Message Broker
+- External API Integration (Open Charge Map)
 
 ### 1.2 Caching Architecture
 ```properties
@@ -114,7 +116,78 @@ spring:
 ```
 - **Response**: Created station object with status 201
 
-## 5. Project Structure
+## 5. External API Integration
+
+### 5.1 Open Charge Map API
+- **Base URL**: https://api.openchargemap.io/v3
+- **Authentication**: API Key in header
+- **Endpoints Used**:
+  - GET /poi - Retrieve Points of Interest (charging stations)
+- **Data Mapping**:
+```java
+// OpenChargeMap to ChargingStation mapping
+{
+    "ID": "id",
+    "AddressInfo.Title": "name",
+    "AddressInfo.AddressLine1": "location",
+    "StatusType.IsOperational": "status",
+    "Connections[0].PowerKW": "powerOutput",
+    "Connections[0].ConnectionType.Title": "connectorType"
+}
+```
+
+### 5.2 Scheduled Data Fetch
+- Frequency: Every hour
+- Fetch Limit: 100 stations per request
+- Error Handling: Exponential backoff retry
+
+## 6. Kafka Configuration
+
+### 6.1 Topics
+```properties
+# Main topic for charging station data
+Name: charging-stations-data
+Partitions: 3
+Replication Factor: 1
+Retention: 7 days
+```
+
+### 6.2 Producer Configuration
+```properties
+spring.kafka.producer.bootstrap-servers=localhost:9092
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+spring.kafka.producer.acks=all
+```
+
+### 6.3 Consumer Configuration
+```properties
+spring.kafka.consumer.bootstrap-servers=localhost:9092
+spring.kafka.consumer.group-id=charging-stations-group
+spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+```
+
+### 6.4 Message Format
+```json
+{
+    "messageId": "uuid",
+    "timestamp": "ISO-8601",
+    "source": "OPEN_CHARGE_MAP",
+    "operation": "CREATE|UPDATE",
+    "payload": {
+        "id": "string",
+        "name": "string",
+        "location": "string",
+        "status": "string",
+        "powerOutput": "number",
+        "connectorType": "string"
+    }
+}
+```
+
+## 7. Project Structure
 ```
 src/
 ├── main/
@@ -124,18 +197,23 @@ src/
 │   │           ├── ChargingStationApplication.java
 │   │           ├── config/
 │   │           │   ├── RedisConfig.java
-│   │           │   └── GatewayConfig.java
+│   │           │   ├── GatewayConfig.java
+│   │           │   └── KafkaConfig.java
 │   │           ├── controller/
 │   │           │   └── ChargingStationController.java
 │   │           ├── model/
-│   │           │   └── ChargingStation.java
+│   │           │   ├── ChargingStation.java
+│   │           │   └── ChargingStationMessage.java
+│   │           ├── service/
+│   │           │   ├── OpenChargeMapService.java
+│   │           │   └── KafkaMessageService.java
 │   │           └── repository/
 │   │               └── ChargingStationRepository.java
 │   └── resources/
 │       └── application.properties
 ```
 
-## 6. Dependencies
+## 8. Dependencies
 
 ```xml
 <properties>
@@ -179,12 +257,24 @@ src/
         <groupId>com.fasterxml.jackson.datatype</groupId>
         <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
+
+    <!-- Kafka -->
+    <dependency>
+        <groupId>org.springframework.kafka</groupId>
+        <artifactId>spring-kafka</artifactId>
+    </dependency>
+
+    <!-- HTTP Client -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
 </dependencies>
 ```
 
-## 7. Configuration
+## 9. Configuration
 
-### 7.1 application.properties
+### 9.1 application.properties
 ```properties
 # Server Configuration
 server.port=8080
@@ -222,4 +312,19 @@ logging.level.org.springframework.cloud.gateway=DEBUG
 logging.level.org.springframework.data.redis=DEBUG
 logging.level.org.springframework.orm.jpa=DEBUG
 logging.level.org.hibernate.SQL=DEBUG
+
+# Kafka Configuration
+spring.kafka.bootstrap-servers=localhost:9092
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JsonSerializer
+spring.kafka.producer.acks=all
+spring.kafka.consumer.group-id=charging-stations-group
+spring.kafka.consumer.auto-offset-reset=earliest
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.JsonDeserializer
+
+# External API Configuration
+opencharge.api.key=${OPENCHARGE_API_KEY}
+opencharge.api.base-url=https://api.openchargemap.io/v3
+opencharge.api.fetch-interval=3600000
 ``` 

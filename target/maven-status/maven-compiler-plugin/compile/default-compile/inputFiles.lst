@@ -2,5 +2,9 @@ C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\conf
 C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\model\ChargingStation.java
 C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\ChargingStationApplication.java
 C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\repository\ChargingStationRepository.java
+C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\config\KafkaConfig.java
+C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\service\KafkaMessageService.java
+C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\service\OpenChargeMapService.java
 C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\config\GatewayConfig.java
 C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\controller\ChargingStationController.java
+C:\Users\osman\OneDrive\Desktop\ChargeSquare\src\main\java\com\chargesquare\model\ChargingStationMessage.java

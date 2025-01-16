@@ -1,7 +1,14 @@
-com\chargesquare\config\RedisConfig.class
+com\chargesquare\model\ChargingStationMessage.class
+com\chargesquare\model\ChargingStation$ChargingStationBuilder.class
 com\chargesquare\ChargingStationApplication.class
 com\chargesquare\controller\ChargingStationController.class
+com\chargesquare\service\OpenChargeMapService.class
+com\chargesquare\model\ChargingStation$StationStatus.class
+com\chargesquare\service\KafkaMessageService.class
+com\chargesquare\model\ChargingStationMessage$ChargingStationMessageBuilder.class
+com\chargesquare\service\OpenChargeMapService$1.class
+com\chargesquare\config\RedisConfig.class
 com\chargesquare\model\ChargingStation.class
 com\chargesquare\repository\ChargingStationRepository.class
+com\chargesquare\config\KafkaConfig.class
 com\chargesquare\config\GatewayConfig.class
-com\chargesquare\model\ChargingStation$StationStatus.class

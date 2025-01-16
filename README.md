@@ -1,43 +1,76 @@
-# Charging Station Microservice with API Gateway and Redis Caching
+# Charging Station Service
 
-A Spring Boot microservice for managing EV charging stations, featuring API Gateway routing and Redis caching for improved performance.
+A reactive microservice for managing EV charging station data, featuring real-time data integration with Open Charge Map API and event-driven architecture using Apache Kafka.
+
+## Features
+
+- Real-time charging station data integration with Open Charge Map API
+- Event-driven architecture using Apache Kafka for data processing
+- Reactive REST API with Spring WebFlux
+- Redis caching for improved performance
+- PostgreSQL persistence for charging station data
+- API Gateway for request routing
+- Automatic data synchronization with external sources
+
+## Technical Stack
+
+- Java 17
+- Spring Boot 3.2.1
+- Spring Cloud Gateway
+- Spring WebFlux
+- Spring Data JPA
+- Spring Kafka
+- PostgreSQL 15
+- Redis 7
+- Apache Kafka 3.6
+- Maven
 
 ## Prerequisites
 
-- Java 17 or higher (JDK, not JRE)
-- Maven 3.6+
-- PostgreSQL 15+
-- Redis 7+
+1. Java 17 or higher
+2. PostgreSQL 15
+3. Redis 7
+4. Apache Kafka 3.6
+5. Maven
 
 ## Setup Instructions
 
 ### 1. Database Setup
-```sql
-CREATE DATABASE evcharging;
-CREATE TABLE charging_stations (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    location VARCHAR(255) NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    power_output DECIMAL(10,2) NOT NULL,
-    connector_type VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```bash
+# Create PostgreSQL database
+createdb evcharging
+
+# Database will be automatically initialized on first run
 ```
 
 ### 2. Redis Setup
-1. Download Redis for Windows from: https://github.com/microsoftarchive/redis/releases
-2. Extract to a location (e.g., C:\Redis)
-3. Start Redis server:
-   ```bash
-   # In Command Prompt (as Administrator)
-   cd C:\Redis
-   redis-server.exe
-   ```
+```bash
+# Install Redis (Windows)
+# Download from https://github.com/microsoftarchive/redis/releases
+# Start Redis
+redis-server
+```
 
-### 3. Configuration
-Configure database and Redis connection in `src/main/resources/application.properties`:
+### 3. Kafka Setup
+```bash
+# Download Kafka
+wget https://downloads.apache.org/kafka/3.6.1/kafka_2.13-3.6.1.tgz
+tar -xzf kafka_2.13-3.6.1.tgz
+cd kafka_2.13-3.6.1
+
+# Start Zookeeper
+bin/windows/zookeeper-server-start.bat config/zookeeper.properties
+
+# Start Kafka
+bin/windows/kafka-server-start.bat config/server.properties
+
+# Create topic
+bin/windows/kafka-topics.bat --create --topic charging-stations-data --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
+```
+
+### 4. Application Configuration
+Configure the application in `src/main/resources/application.properties`:
+
 ```properties
 # Database
 spring.datasource.url=jdbc:postgresql://localhost:5432/evcharging
@@ -47,126 +80,91 @@ spring.datasource.password=postgres
 # Redis
 spring.redis.host=localhost
 spring.redis.port=6379
-spring.redis.timeout=2000
 
-# Cache
-spring.cache.type=redis
-spring.cache.redis.time-to-live=300000
+# Kafka
+spring.kafka.bootstrap-servers=localhost:9092
+
+# Open Charge Map API
+opencharge.api.key=your_api_key_here
+opencharge.api.base-url=https://api.openchargemap.io/v3
 ```
 
-### 4. Build and Run
+### 5. Build and Run
 ```bash
-# Build the project
+# Build
 mvn clean install
 
-# Run the application
+# Run
 mvn spring-boot:run
 ```
 
-The service will be available at `http://localhost:8080`
+## API Endpoints
 
-## Architecture
+### Charging Stations
+- GET `/stations` - List all charging stations (Cached)
+- GET `/stations/{id}` - Get station by ID
+- POST `/stations` - Create new station
 
-The service implements:
-1. Spring Cloud Gateway for routing
-2. Redis caching for frequently accessed endpoints (5-minute TTL)
-3. PostgreSQL for persistent storage
-4. Reactive programming with WebFlux
+## Data Flow
 
-## API Documentation
+1. **External Data Integration**
+   - Scheduled job fetches data from Open Charge Map API
+   - Data is normalized to internal model
+   - Fetched data is published to Kafka topic
 
-### 1. List All Stations (Redis Cached)
-- **Endpoint**: GET /stations
-- **Description**: Retrieves all charging stations (cached for 5 minutes)
-- **Response**: Array of charging stations
-- **Example Response**:
-```json
-[
-    {
-        "id": 1,
-        "name": "Station Alpha",
-        "location": "123 Main Street, Istanbul",
-        "status": "AVAILABLE",
-        "powerOutput": 150.0,
-        "connectorType": "CCS2",
-        "createdAt": "2024-01-16T10:00:00",
-        "updatedAt": "2024-01-16T10:00:00"
-    }
-]
-```
+2. **Message Processing**
+   - Kafka consumer processes messages
+   - Data is validated and stored in PostgreSQL
+   - Cache is automatically updated
 
-### 2. Get Station by ID (Reactor Cached)
-- **Endpoint**: GET /stations/{id}
-- **Description**: Retrieves a specific charging station (cached using Reactor)
-- **Parameters**: id - Station ID
-- **Response**: Single charging station or 404 if not found
+3. **API Access**
+   - REST endpoints serve data from cache/database
+   - Gateway routes requests appropriately
+   - Redis caching improves response times
 
-### 3. Create New Station
-- **Endpoint**: POST /stations
-- **Description**: Creates a new charging station (invalidates Redis cache)
-- **Request Body**: Charging station details
-- **Headers**: Content-Type: application/json
-- **Example Request**:
-```json
-{
-    "name": "Station Alpha",
-    "location": "123 Main Street, Istanbul",
-    "status": "AVAILABLE",
-    "powerOutput": 150.0,
-    "connectorType": "CCS2"
-}
-```
+## Monitoring
 
-## Project Structure
-```
-src/
-├── main/
-│   ├── java/
-│   │   └── com/
-│   │       └── chargesquare/
-│   │           ├── ChargingStationApplication.java
-│   │           ├── config/
-│   │           │   ├── RedisConfig.java
-│   │           │   └── GatewayConfig.java
-│   │           ├── controller/
-│   │           │   └── ChargingStationController.java
-│   │           ├── model/
-│   │           │   └── ChargingStation.java
-│   │           └── repository/
-│   │               └── ChargingStationRepository.java
-│   └── resources/
-│       └── application.properties
-```
+The application includes detailed logging for:
+- Kafka message processing
+- API Gateway operations
+- Redis cache operations
+- Database transactions
+- External API calls
 
-## Technologies Used
+## Configuration Properties
 
-- Spring Boot 3.2.1
-- Spring Cloud Gateway
-- Spring WebFlux
-- Spring Data Redis
-- Spring Data JPA/Hibernate
-- PostgreSQL 15
-- Redis 7
-- Maven
-- Java 17
+### Kafka Settings
+- Topic: charging-stations-data
+- Partitions: 3
+- Replication Factor: 1
+- Consumer Group: charging-stations-group
 
-## Caching Strategy
+### Caching
+- Provider: Redis
+- TTL: 5 minutes
+- Null Values: Not cached
 
-The service implements two types of caching:
-1. Redis Caching:
-   - GET /stations endpoint (5 minutes TTL)
-   - Automatically invalidated on new station creation
+### API Integration
+- Fetch Interval: 60 seconds (configurable)
+- Batch Size: 100 stations
+- Retry: Exponential backoff
 
-2. Reactor Caching:
-   - GET /stations/{id} endpoint
-   - In-memory caching using Reactor's cache() operator
+## Error Handling
 
-## Build Output
+- Kafka consumer retries with backoff
+- API rate limiting compliance
+- Database transaction management
+- Cache eviction on updates
+- Comprehensive error logging
 
-The build process generates:
-- Main JAR: target/charging-station-service-1.0.0.jar
-- Original JAR: target/charging-station-service-1.0.0.jar.original
+## Contributing
 
-## Development
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-For VS Code users, basic settings are provided in `.vscode/settings.json`. 
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details 
